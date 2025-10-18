@@ -134,10 +134,12 @@ body {
 .input-wrapper {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 #todoInput {
     flex: 1;
+    min-width: 200px;
     padding: 15px 20px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 15px;
@@ -154,6 +156,31 @@ body {
 }
 
 #todoInput:focus {
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.deadline-input {
+    padding: 15px 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    font-size: 0.95em;
+    transition: all 0.3s ease;
+    outline: none;
+    cursor: pointer;
+}
+
+.deadline-input::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+.deadline-input:focus {
     border-color: rgba(255, 255, 255, 0.6);
     background: rgba(255, 255, 255, 0.25);
     transform: translateY(-2px);
@@ -292,6 +319,42 @@ body {
     color: rgba(255, 255, 255, 0.6);
 }
 
+.todo-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.todo-text {
+    color: #ffffff;
+    font-size: 1em;
+    word-break: break-word;
+}
+
+.deadline {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85em;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    width: fit-content;
+}
+
+.deadline svg {
+    flex-shrink: 0;
+}
+
+.deadline.overdue {
+    background: rgba(245, 87, 108, 0.3);
+    color: #ffcdd2;
+    font-weight: 600;
+}
+
 .checkbox {
     width: 22px;
     height: 22px;
@@ -410,9 +473,18 @@ body {
     .input-wrapper {
         flex-direction: column;
     }
+    
+    #todoInput {
+        min-width: 100%;
+    }
+    
+    .deadline-input {
+        width: 100%;
+    }
 
     .add-btn {
         justify-content: center;
+        width: 100%;
     }
 
     .filters {
