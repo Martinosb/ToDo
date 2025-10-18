@@ -1,5 +1,5 @@
 // State management
-let todos = JSON.parse(localStorage.getItem('todos')) || [];
+let todos = [];
 let currentFilter = 'all';
 
 // DOM elements
@@ -13,7 +13,8 @@ const totalTasksSpan = document.getElementById('totalTasks');
 const completedTasksSpan = document.getElementById('completedTasks');
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadTodosFromSupabase();
     renderTodos();
     updateStats();
 });
@@ -26,7 +27,7 @@ todoInput.addEventListener('keypress', (e) => {
     }
 });
 
-function addTodo() {
+async function addTodo() {
     const text = todoInput.value.trim();
     
     if (text === '') {
@@ -39,15 +40,25 @@ function addTodo() {
     }
     
     const todo = {
-        id: Date.now(),
         text: text,
         completed: false,
-        createdAt: new Date().toISOString(),
         deadline: deadlineInput.value || null
     };
     
-    todos.unshift(todo);
-    saveTodos();
+    // Insert into Supabase
+    const { data, error } = await supabase
+        .from('toDo')
+        .insert([todo])
+        .select();
+    
+    if (error) {
+        console.error('Error adding todo:', error);
+        alert('Failed to add todo. Please try again.');
+        return;
+    }
+    
+    // Add to local state
+    todos.unshift(data[0]);
     renderTodos();
     updateStats();
     
@@ -107,24 +118,48 @@ function renderTodos() {
 }
 
 // Toggle todo completion
-function toggleTodo(id) {
+async function toggleTodo(id) {
     const todo = todos.find(t => t.id === id);
     if (todo) {
-        todo.completed = !todo.completed;
-        saveTodos();
+        const newCompletedState = !todo.completed;
+        
+        // Update in Supabase
+        const { error } = await supabase
+            .from('toDo')
+            .update({ completed: newCompletedState })
+            .eq('id', id);
+        
+        if (error) {
+            console.error('Error updating todo:', error);
+            return;
+        }
+        
+        // Update local state
+        todo.completed = newCompletedState;
         renderTodos();
         updateStats();
     }
 }
 
 // Delete todo
-function deleteTodo(id) {
+async function deleteTodo(id) {
     const todoElement = document.querySelector(`[data-id="${id}"]`);
     todoElement.style.animation = 'todoSlideOut 0.3s ease-out';
     
-    setTimeout(() => {
+    setTimeout(async () => {
+        // Delete from Supabase
+        const { error } = await supabase
+            .from('toDo')
+            .delete()
+            .eq('id', id);
+        
+        if (error) {
+            console.error('Error deleting todo:', error);
+            return;
+        }
+        
+        // Update local state
         todos = todos.filter(t => t.id !== id);
-        saveTodos();
         renderTodos();
         updateStats();
     }, 300);
@@ -152,10 +187,23 @@ function getFilteredTodos() {
 }
 
 // Clear completed
-clearCompletedBtn.addEventListener('click', () => {
-    if (todos.some(t => t.completed)) {
+clearCompletedBtn.addEventListener('click', async () => {
+    const completedIds = todos.filter(t => t.completed).map(t => t.id);
+    
+    if (completedIds.length > 0) {
+        // Delete from Supabase
+        const { error } = await supabase
+            .from('toDo')
+            .delete()
+            .in('id', completedIds);
+        
+        if (error) {
+            console.error('Error clearing completed todos:', error);
+            return;
+        }
+        
+        // Update local state
         todos = todos.filter(t => !t.completed);
-        saveTodos();
         renderTodos();
         updateStats();
     }
@@ -170,9 +218,19 @@ function updateStats() {
     completedTasksSpan.textContent = `${completed} completed`;
 }
 
-// Local storage
-function saveTodos() {
-    localStorage.setItem('todos', JSON.stringify(todos));
+// Load todos from Supabase
+async function loadTodosFromSupabase() {
+    const { data, error } = await supabase
+        .from('toDo')
+        .select('*')
+        .order('created_at', { ascending: false });
+    
+    if (error) {
+        console.error('Error loading todos:', error);
+        return;
+    }
+    
+    todos = data || [];
 }
 
 // Utility function to escape HTML
