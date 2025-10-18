@@ -1,6 +1,7 @@
 // State management
 let todos = [];
 let currentFilter = 'all';
+let currentUser = null;
 
 // DOM elements
 const todoInput = document.getElementById('todoInput');
@@ -12,12 +13,82 @@ const clearCompletedBtn = document.getElementById('clearCompleted');
 const totalTasksSpan = document.getElementById('totalTasks');
 const completedTasksSpan = document.getElementById('completedTasks');
 
+// Auth elements
+const authSection = document.getElementById('authSection');
+const todoSection = document.getElementById('todoSection');
+const signInBtn = document.getElementById('signInBtn');
+const signOutBtn = document.getElementById('signOutBtn');
+const userAvatar = document.getElementById('userAvatar');
+const userName = document.getElementById('userName');
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadTodosFromSupabase();
-    renderTodos();
-    updateStats();
+    // Set up auth state listener
+    supabase.auth.onAuthStateChange((event, session) => {
+        if (session) {
+            currentUser = session.user;
+            showTodoApp();
+            loadTodosFromSupabase();
+        } else {
+            currentUser = null;
+            showAuthScreen();
+        }
+    });
+
+    // Check current session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        showTodoApp();
+        await loadTodosFromSupabase();
+        renderTodos();
+        updateStats();
+    }
 });
+
+// Authentication functions
+signInBtn.addEventListener('click', signInWithGoogle);
+signOutBtn.addEventListener('click', signOut);
+
+async function signInWithGoogle() {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            redirectTo: window.location.origin
+        }
+    });
+    
+    if (error) {
+        console.error('Error signing in:', error);
+        alert('Failed to sign in. Please try again.');
+    }
+}
+
+async function signOut() {
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+        console.error('Error signing out:', error);
+        alert('Failed to sign out. Please try again.');
+    }
+}
+
+function showTodoApp() {
+    authSection.style.display = 'none';
+    todoSection.style.display = 'block';
+    
+    // Update user profile
+    if (currentUser) {
+        userAvatar.src = currentUser.user_metadata.avatar_url || '';
+        userName.textContent = currentUser.user_metadata.full_name || currentUser.email;
+    }
+}
+
+function showAuthScreen() {
+    authSection.style.display = 'block';
+    todoSection.style.display = 'none';
+    todos = [];
+}
 
 // Add todo
 addBtn.addEventListener('click', addTodo);
@@ -39,10 +110,16 @@ async function addTodo() {
         return;
     }
     
+    if (!currentUser) {
+        alert('Please sign in to add todos');
+        return;
+    }
+    
     const todo = {
         text: text,
         completed: false,
-        deadline: deadlineInput.value || null
+        deadline: deadlineInput.value || null,
+        user_id: currentUser.id
     };
     
     // Insert into Supabase
@@ -220,9 +297,12 @@ function updateStats() {
 
 // Load todos from Supabase
 async function loadTodosFromSupabase() {
+    if (!currentUser) return;
+    
     const { data, error } = await supabase
         .from('toDo')
         .select('*')
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false });
     
     if (error) {
@@ -231,6 +311,8 @@ async function loadTodosFromSupabase() {
     }
     
     todos = data || [];
+    renderTodos();
+    updateStats();
 }
 
 // Utility function to escape HTML
